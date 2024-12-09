@@ -1,6 +1,6 @@
 use std::{thread, time::Duration};
 use rdev::{simulate, EventType};
-use log::error;
+use log::{debug, error, info};
 
 #[derive(Debug)]
 pub(crate) enum Trigger {
@@ -31,18 +31,23 @@ impl Macro {
         if !self.trigger.on_event(event) {
             return;
         }
-        println!("macro triggered");
+        debug!(">>> Macro triggered");
         for action in self.actions.iter() {
+            debug!("{action:?}");
             let event_type = match action {
                 Action::Event(event_type) => *event_type,
                 Action::MoveToStart => EventType::MouseMove { x: mouse_pos.0 as f64, y: mouse_pos.1 as f64 },
+                Action::Wait(ms) => { 
+                    thread::sleep(Duration::from_millis(*ms as u64));
+                    continue;
+                }
             };
-            println!("{event_type:?}");
             if let Err(_) = simulate(&event_type) {
                 error!("Couldn't simulate {:?}", &event_type);
             };
-            thread::sleep(Duration::from_millis(80));
+            thread::sleep(Duration::from_millis(40));
         }
+        debug!("<<< done")
     }
 
     pub fn apply_offset(&mut self, offset_x: i32, offset_y: i32) {
@@ -61,5 +66,6 @@ impl Macro {
 #[derive(Debug)]
 pub(crate) enum Action {
     Event(EventType),
-    MoveToStart
+    MoveToStart,
+    Wait(u32)
 }

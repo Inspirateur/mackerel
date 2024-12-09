@@ -1,4 +1,4 @@
-use nom::{bytes::complete::tag, character::complete::{digit1, line_ending, multispace0, multispace1, space0}, combinator::{eof, map, map_res}, error::{Error, ParseError}, multi::{many1, separated_list1}, sequence::delimited, IResult};
+use nom::{bytes::complete::tag, character::complete::{digit1, line_ending, multispace0, multispace1, space0, space1}, combinator::{eof, map, map_res, opt}, error::{Error, ParseError}, multi::{many1, separated_list1}, sequence::{delimited, tuple}, IResult};
 use rdev::{Button, EventType, Key};
 use crate::{script::{Action, Trigger}, Macro};
 
@@ -22,7 +22,7 @@ fn parse_trigger(input: &str) -> IResult<&str, Trigger> {
     let (input, actions) = separated_list1(ws(tag("+")), parse_trigger_press)(input)?;
     let actions = actions.into_iter().map(|action| match action {
         Action::Event(event_type) => event_type,
-        Action::MoveToStart => unreachable!(),
+        _ => unreachable!(),
     }).collect::<Vec<_>>();
     Ok((input, if actions.len() == 1 { Trigger::Single(actions[0]) } else { Trigger::Combo(actions) } ))
 }
@@ -43,13 +43,21 @@ fn parse_action(input: &str) -> IResult<&str, Vec<Action>> {
     let (input, action) = parse_press(input)
         .or(parse_hold(input))
         .or(parse_release(input))
-        .or(parse_move(input))?;
+        .or(parse_move(input))
+        .or(parse_wait(input))?;
     Ok((input, action))
+}
+
+fn parse_wait(input: &str) -> IResult<&str, Vec<Action>> {
+    let (input, _) = tag("wait")(input)?;
+    let (input, _) = space1(input)?;
+    let (input, ms) = parse_seconds(input)?;
+    Ok((input, vec![Action::Wait(ms)]))
 }
 
 fn parse_press(input: &str) -> IResult<&str, Vec<Action>> {
     let (input, _) = tag("press")(input)?;
-    let (input, _) = multispace1(input)?;
+    let (input, _) = space1(input)?;
     let (input, action) = map(parse_button, button_press_release)(input)
         .or_else(|_: nom::Err<Error<&str>>| map(parse_key, key_press_release)(input))?;
     Ok((input, action))
@@ -57,7 +65,7 @@ fn parse_press(input: &str) -> IResult<&str, Vec<Action>> {
 
 fn parse_hold(input: &str) -> IResult<&str, Vec<Action>> {
     let (input, _) = tag("hold")(input)?;
-    let (input, _) = multispace1(input)?;
+    let (input, _) = space1(input)?;
     let (input, action) = map(parse_button, button_press)(input)
         .or_else(|_: nom::Err<Error<&str>>| map(parse_key, key_press)(input))?;
     Ok((input, vec![action]))
@@ -65,7 +73,7 @@ fn parse_hold(input: &str) -> IResult<&str, Vec<Action>> {
 
 fn parse_release(input: &str) -> IResult<&str, Vec<Action>> {
     let (input, _) = tag("release")(input)?;
-    let (input, _) = multispace1(input)?;
+    let (input, _) = space1(input)?;
     let (input, action) = map(parse_button, button_release)(input)
         .or_else(|_: nom::Err<Error<&str>>| map(parse_key, key_release)(input))?;
     Ok((input, vec![action]))
@@ -96,6 +104,18 @@ fn parse_loc(input: &str) -> IResult<&str, (i32, i32)> {
     let (input, _) = ws(tag(","))(input)?;
     let (input, y) = map_res(digit1, str::parse)(input)?;
     Ok((input, (x, y)))
+}
+
+/// Result in ms
+fn parse_seconds(input: &str) -> IResult<&str, u32> {
+    let (input, i) = digit1(input)?;
+    let (input, opt_dec) = opt(tuple((tag("."), digit1)))(input)?;
+    let dec = if let Some((_, d)) = opt_dec {
+        d[0..3.min(d.len())].parse::<u32>().unwrap()
+    } else {
+        0
+    };
+    Ok((input, i.parse::<u32>().unwrap()*1000 + dec*100))
 }
 
 fn statement_end(input: &str) -> IResult<&str, ()> {
@@ -146,6 +166,16 @@ fn button_press_release(button: Button) -> Vec<Action> {
 #[cfg(test)]
 mod tests {
     use crate::parse::*;
+
+    #[test]
+    fn test_parse_seconds() {
+        let secdef1 = "0.1234";
+        let secdef2 = "0.123";
+        let (_, ms1) = parse_seconds(secdef1).unwrap();
+        let (_, ms2) = parse_seconds(secdef2).unwrap();
+        assert_eq!(123, ms1);
+        assert_eq!(123, ms2);
+    }
 
     #[test]
     fn test_parse_action() {

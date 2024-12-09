@@ -1,5 +1,5 @@
 use std::fs;
-use log::error;
+use log::{error, LevelFilter};
 use rdev::{listen, EventType};
 use serde::Deserialize;
 
@@ -10,6 +10,7 @@ pub struct Offset {
 }
 
 fn main() {
+    env_logger::builder().filter_level(LevelFilter::Debug).init();
     let offset = fs::read_to_string("offset.toml").map_or(Offset::default(), |file| toml::from_str(&file).unwrap());
     let macro_defs = fs::read_to_string("macros.txt")
         .expect("Couldn't read 'macros.txt'");
