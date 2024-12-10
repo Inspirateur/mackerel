@@ -10,6 +10,12 @@ struct Offset {
     pub s: f64,
 }
 
+impl Offset {
+    pub fn transform(&self, x: f64, y: f64) -> (f64, f64) {
+        ((x + self.x as f64)/self.s, (y + self.y as f64)/self.s)
+    }
+}
+
 impl Default for Offset {
     fn default() -> Self {
         Self {
@@ -42,8 +48,9 @@ fn main() {
     if let Err(err) = listen(move |event| {
         let event_type = match event.event_type {
             EventType::MouseMove { x, y } => {
-                mouse_pos = ((x*offset.s) as i32 + offset.x, (y*offset.s) as i32 + offset.y);
-                EventType::MouseMove { x: x*offset.s + offset.x as f64, y: y*offset.s + offset.y as f64 }
+                let (x, y) = offset.transform(x, y);
+                mouse_pos = (x as i32, y as i32);
+                EventType::MouseMove { x, y }
             },
             x => x
         };
