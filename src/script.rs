@@ -1,6 +1,6 @@
 use std::{thread, time::Duration};
 use rdev::{simulate, EventType};
-use log::{debug, error, info};
+use log::{debug, error};
 
 #[derive(Debug)]
 pub(crate) enum Trigger {
@@ -45,7 +45,7 @@ impl Macro {
             if let Err(_) = simulate(&event_type) {
                 error!("Couldn't simulate {:?}", &event_type);
             };
-            thread::sleep(Duration::from_millis(40));
+            thread::sleep(Duration::from_millis(30));
         }
         debug!("<<< done")
     }
