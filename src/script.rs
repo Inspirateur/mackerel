@@ -45,7 +45,7 @@ impl Macro {
             if let Err(_) = simulate(&event_type) {
                 error!("Couldn't simulate {:?}", &event_type);
             };
-            thread::sleep(Duration::from_millis(30));
+            thread::sleep(Duration::from_millis(40));
         }
         debug!("<<< done")
     }
